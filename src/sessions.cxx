@@ -16,7 +16,7 @@
 /**
  * Name of our cookie.
  */
-#define COOKIE_NAME "session"
+static const std::string COOKIE_NAME = "session";
 
 
 /**
@@ -105,7 +105,7 @@ get_session (mhd::Connection* connection)
 
 	cookie = MHD_lookup_connection_value (connection,
 			MHD_COOKIE_KIND,
-			COOKIE_NAME);
+			COOKIE_NAME.c_str());
 	if (cookie != nullptr)
 	{
 		/* find existing session */
@@ -158,7 +158,7 @@ get_session (mhd::Connection* connection)
 typedef int (*PageHandler)(const void *cls,
 		const char *mime,
 		struct Session *session,
-		struct MHD_Connection *connection);
+		mhd::Connection* connection);
 
 
 /**
@@ -202,11 +202,11 @@ add_session_cookie (struct Session *session,
 	snprintf (cstr,
 			sizeof (cstr),
 			"%s=%s",
-			COOKIE_NAME,
+			COOKIE_NAME.c_str(),
 			session->sid);
 	if (MHD_NO ==
 			MHD_add_response_header (response,
-					MHD_HTTP_HEADER_SET_COOKIE,
+					mhd::http_header::set_cookie.c_str(),
 					cstr))
 	{
 		fprintf (stderr,
@@ -267,7 +267,7 @@ fill_v1_form (const void *cls,
 	int ret;
 	const char* form = (const char*)cls;
 	char *reply;
-	struct MHD_Response *response;
+	mhd::Response* response;
 
 	if (-1 == asprintf (&reply,
 			form,
@@ -304,12 +304,12 @@ static int
 fill_v1_v2_form (const void *cls,
 		const char *mime,
 		struct Session *session,
-		struct MHD_Connection *connection)
+		mhd::Connection* connection)
 {
 	int ret;
 	const char* form = (const char*)cls;
 	char *reply;
-	struct MHD_Response *response;
+	mhd::Response* response;
 
 	if (-1 == asprintf (&reply,
 			form,
@@ -325,7 +325,7 @@ fill_v1_v2_form (const void *cls,
 			MHD_RESPMEM_MUST_FREE);
 	add_session_cookie (session, response);
 	MHD_add_response_header (response,
-			MHD_HTTP_HEADER_CONTENT_ENCODING,
+			mhd::http_header::content_encoding.c_str(),
 			mime);
 	ret = MHD_queue_response (connection,
 			MHD_HTTP_OK,
@@ -350,7 +350,7 @@ not_found_page (const void* /*cls*/,
 		struct MHD_Connection *connection)
 {
 	int ret;
-	struct MHD_Response *response;
+	mhd::Response* response;
 
 	const std::string page_source = getPageSource(PageSource::not_found_error);
 	/* unsupported HTTP method */
@@ -420,7 +420,7 @@ post_iterator (void *cls,
 				session->sid,
 				session->value_1,
 				session->value_2);
-		return MHD_YES;
+		return mhd::yes;
 	}
 	if (0 == strcmp ("v1", key))
 	{
@@ -431,7 +431,7 @@ post_iterator (void *cls,
 				size);
 		if (size + off < sizeof (session->value_1))
 			session->value_1[size+off] = '\0';
-		return MHD_YES;
+		return mhd::yes;
 	}
 	if (0 == strcmp ("v2", key))
 	{
@@ -442,10 +442,10 @@ post_iterator (void *cls,
 				size);
 		if (size + off < sizeof (session->value_2))
 			session->value_2[size+off] = '\0';
-		return MHD_YES;
+		return mhd::yes;
 	}
 	fprintf (stderr, "Unsupported form value `%s'\n", key);
-	return MHD_YES;
+	return mhd::yes;
 }
 
 
@@ -485,7 +485,7 @@ post_iterator (void *cls,
  */
 static int
 create_response (void* /*cls*/,
-		struct MHD_Connection *connection,
+		mhd::Connection* connection,
 		const char *url,
 		const char *method,
 		const char* /*version*/,
@@ -493,7 +493,7 @@ create_response (void* /*cls*/,
 		size_t *upload_data_size,
 		void **ptr)
 {
-	struct MHD_Response *response;
+	mhd::Response *response;
 	struct Request *request;
 	struct Session *session;
 	int ret;
@@ -506,21 +506,20 @@ create_response (void* /*cls*/,
 		if (nullptr == request)
 		{
 			fprintf (stderr, "memory error: %s\n", strerror (errno));
-			return MHD_NO;
+			return mhd::no;
 		}
 		*ptr = request;
-		if (0 == strcmp (method, MHD_HTTP_METHOD_POST))
-		{
+		if (method == mhd::http_method::post) {
 			request->pp = MHD_create_post_processor (connection, 1024,
 					&post_iterator, request);
 			if (nullptr == request->pp)
 			{
 				fprintf (stderr, "Failed to setup post processor for `%s'\n",
 						url);
-				return MHD_NO; /* internal error */
+				return mhd::no; /* internal error */
 			}
 		}
-		return MHD_YES;
+		return mhd::yes;
 	}
 	if (nullptr == request->session)
 	{
@@ -529,13 +528,13 @@ create_response (void* /*cls*/,
 		{
 			fprintf (stderr, "Failed to setup session for `%s'\n",
 					url);
-			return MHD_NO; /* internal error */
+			return mhd::no; /* internal error */
 		}
 	}
 	session = request->session;
 	session->start = time (nullptr);
-	if (0 == strcmp (method, MHD_HTTP_METHOD_POST))
-	{
+	if (method == mhd::http_method::post) {
+
 		/* evaluate POST data */
 		MHD_post_process (request->pp,
 				upload_data,
@@ -543,19 +542,17 @@ create_response (void* /*cls*/,
 		if (0 != *upload_data_size)
 		{
 			*upload_data_size = 0;
-			return MHD_YES;
+			return mhd::yes;
 		}
 		/* done with POST data, serve response */
 		MHD_destroy_post_processor (request->pp);
 		request->pp = nullptr;
-		method = MHD_HTTP_METHOD_GET; /* fake 'GET' */
+		method = mhd::http_method::get.c_str(); /* fake 'GET' */
 		if (nullptr != request->post_url)
 			url = request->post_url;
 	}
 
-	if ( (0 == strcmp (method, MHD_HTTP_METHOD_GET)) ||
-			(0 == strcmp (method, MHD_HTTP_METHOD_HEAD)) )
-	{
+	if ( (method == mhd::http_method::get) || (method == mhd::http_method::head) ) {
 		/* find out which page to serve */
 		i=0;
 		while ( (pages[i].url != nullptr) &&
@@ -565,7 +562,7 @@ create_response (void* /*cls*/,
 		ret = pages[i].handler (source.c_str(),
 				pages[i].mime,
 				session, connection);
-		if (ret != MHD_YES)
+		if (ret != mhd::yes)
 			fprintf (stderr, "Failed to create page for `%s'\n",
 					url);
 		return ret;
@@ -576,7 +573,7 @@ create_response (void* /*cls*/,
 			const_cast<char*>(error_source.c_str()),
 			MHD_RESPMEM_PERSISTENT);
 	ret = MHD_queue_response (connection,
-			MHD_HTTP_METHOD_NOT_ACCEPTABLE,
+			mhd::http_method_not_acceptable,
 			response);
 	MHD_destroy_response (response);
 	return ret;
@@ -651,7 +648,7 @@ expire_sessions ()
 int
 main (int argc, char *const *argv)
 {
-	struct MHD_Daemon *d;
+	mhd::Daemon* d;
 	struct timeval tv;
 	struct timeval *tvp;
 	fd_set rs;
