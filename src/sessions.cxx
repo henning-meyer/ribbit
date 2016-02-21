@@ -24,36 +24,36 @@
  */
 struct Session
 {
-  /**
-   * We keep all sessions in a linked list.
-   */
-  struct Session *next = nullptr;
+	/**
+	 * We keep all sessions in a linked list.
+	 */
+	struct Session *next = nullptr;
 
-  /**
-   * Unique ID for this session.
-   */
-  char sid[33] = {0};
+	/**
+	 * Unique ID for this session.
+	 */
+	char sid[33] = {0};
 
-  /**
-   * Reference counter giving the number of connections
-   * currently using this session.
-   */
-  unsigned int rc = 0;
+	/**
+	 * Reference counter giving the number of connections
+	 * currently using this session.
+	 */
+	unsigned int rc = 0;
 
-  /**
-   * Time when this session was last active.
-   */
-  time_t start = 0;
+	/**
+	 * Time when this session was last active.
+	 */
+	time_t start = 0;
 
-  /**
-   * String submitted via form.
-   */
-  char value_1[64] = {0};
+	/**
+	 * String submitted via form.
+	 */
+	char value_1[64] = {0};
 
-  /**
-   * Another value submitted via form.
-   */
-  char value_2[64] = {0};
+	/**
+	 * Another value submitted via form.
+	 */
+	char value_2[64] = {0};
 
 };
 
@@ -64,22 +64,22 @@ struct Session
 struct Request
 {
 
-  /**
-   * Associated session.
-   */
-  Session* session = nullptr;
+	/**
+	 * Associated session.
+	 */
+	Session* session = nullptr;
 
-  /**
-   * Post processor handling form data (IF this is
-   * a POST request).
-   */
-  mhd::PostProcessor* pp = nullptr;
+	/**
+	 * Post processor handling form data (IF this is
+	 * a POST request).
+	 */
+	mhd::PostProcessor* pp = nullptr;
 
-  /**
-   * URL to serve in response to this POST (if this request
-   * was a 'POST')
-   */
-  const char* post_url = nullptr;
+	/**
+	 * URL to serve in response to this POST (if this request
+	 * was a 'POST')
+	 */
+	const char* post_url = nullptr;
 
 };
 
@@ -100,49 +100,49 @@ static struct Session *sessions = nullptr;
 static struct Session *
 get_session (mhd::Connection* connection)
 {
-  struct Session *ret;
-  const char *cookie;
+	struct Session *ret;
+	const char *cookie;
 
-  cookie = MHD_lookup_connection_value (connection,
-					MHD_COOKIE_KIND,
-					COOKIE_NAME);
-  if (cookie != nullptr)
-    {
-      /* find existing session */
-      ret = sessions;
-      while (nullptr != ret)
+	cookie = MHD_lookup_connection_value (connection,
+			MHD_COOKIE_KIND,
+			COOKIE_NAME);
+	if (cookie != nullptr)
 	{
-	  if (0 == strcmp (cookie, ret->sid))
-	    break;
-	  ret = ret->next;
+		/* find existing session */
+		ret = sessions;
+		while (nullptr != ret)
+		{
+			if (0 == strcmp (cookie, ret->sid))
+				break;
+			ret = ret->next;
+		}
+		if (nullptr != ret)
+		{
+			ret->rc++;
+			return ret;
+		}
 	}
-      if (nullptr != ret)
+	/* create fresh session */
+	ret = new (std::nothrow) Session();
+	if (nullptr == ret)
 	{
-	  ret->rc++;
-	  return ret;
+		fprintf (stderr, "memory error: %s\n", strerror (errno));
+		return nullptr;
 	}
-    }
-  /* create fresh session */
-  ret = new (std::nothrow) Session();
-  if (nullptr == ret)
-    {
-      fprintf (stderr, "memory error: %s\n", strerror (errno));
-      return nullptr;
-    }
-  /* not a super-secure way to generate a random session ID,
+	/* not a super-secure way to generate a random session ID,
      but should do for a simple example... */
-  snprintf (ret->sid,
-	    sizeof (ret->sid),
-	    "%X%X%X%X",
-	    (unsigned int) rand (),
-	    (unsigned int) rand (),
-	    (unsigned int) rand (),
-	    (unsigned int) rand ());
-  ret->rc++;
-  ret->start = time (nullptr);
-  ret->next = sessions;
-  sessions = ret;
-  return ret;
+	snprintf (ret->sid,
+			sizeof (ret->sid),
+			"%X%X%X%X",
+			(unsigned int) rand (),
+			(unsigned int) rand (),
+			(unsigned int) rand (),
+			(unsigned int) rand ());
+	ret->rc++;
+	ret->start = time (nullptr);
+	ret->next = sessions;
+	sessions = ret;
+	return ret;
 }
 
 
@@ -156,9 +156,9 @@ get_session (mhd::Connection* connection)
  * @param MHD_YES on success, MHD_NO on failure
  */
 typedef int (*PageHandler)(const void *cls,
-			   const char *mime,
-			   struct Session *session,
-			   struct MHD_Connection *connection);
+		const char *mime,
+		struct Session *session,
+		struct MHD_Connection *connection);
 
 
 /**
@@ -166,25 +166,25 @@ typedef int (*PageHandler)(const void *cls,
  */
 struct Page
 {
-  /**
-   * Acceptable URL for this page.
-   */
-  const char *url;
+	/**
+	 * Acceptable URL for this page.
+	 */
+	const char *url;
 
-  /**
-   * Mime type to set for the page.
-   */
-  const char *mime;
+	/**
+	 * Mime type to set for the page.
+	 */
+	const char *mime;
 
-  /**
-   * Handler to call to generate response.
-   */
-  PageHandler handler;
+	/**
+	 * Handler to call to generate response.
+	 */
+	PageHandler handler;
 
-  /**
-   * Extra argument to handler.
-   */
-  PageSource source;
+	/**
+	 * Extra argument to handler.
+	 */
+	PageSource source;
 };
 
 
@@ -196,22 +196,22 @@ struct Page
  */
 static void
 add_session_cookie (struct Session *session,
-		    mhd::Response *response)
+		mhd::Response *response)
 {
-  char cstr[256];
-  snprintf (cstr,
-	    sizeof (cstr),
-	    "%s=%s",
-	    COOKIE_NAME,
-	    session->sid);
-  if (MHD_NO ==
-      MHD_add_response_header (response,
-			       MHD_HTTP_HEADER_SET_COOKIE,
-			       cstr))
-    {
-      fprintf (stderr,
-	       "Failed to set session cookie header!\n");
-    }
+	char cstr[256];
+	snprintf (cstr,
+			sizeof (cstr),
+			"%s=%s",
+			COOKIE_NAME,
+			session->sid);
+	if (MHD_NO ==
+			MHD_add_response_header (response,
+					MHD_HTTP_HEADER_SET_COOKIE,
+					cstr))
+	{
+		fprintf (stderr,
+				"Failed to set session cookie header!\n");
+	}
 }
 
 
@@ -226,27 +226,27 @@ add_session_cookie (struct Session *session,
  */
 static int
 serve_simple_form (const void *cls,
-		   const char *mime,
-		   struct Session *session,
-		   mhd::Connection *connection)
+		const char *mime,
+		struct Session *session,
+		mhd::Connection *connection)
 {
-  int ret;
-  const char* form = (const char*)cls;
-  mhd::Response* response;
+	int ret;
+	const char* form = (const char*)cls;
+	mhd::Response* response;
 
-  /* return static form */
-  response = MHD_create_response_from_buffer (strlen (form),
-					      (void *) form,
-					      MHD_RESPMEM_PERSISTENT);
-  add_session_cookie (session, response);
-  MHD_add_response_header (response,
-			   MHD_HTTP_HEADER_CONTENT_ENCODING,
-			   mime);
-  ret = MHD_queue_response (connection,
-			    MHD_HTTP_OK,
-			    response);
-  MHD_destroy_response (response);
-  return ret;
+	/* return static form */
+	response = MHD_create_response_from_buffer (strlen (form),
+			(void *) form,
+			MHD_RESPMEM_PERSISTENT);
+	add_session_cookie (session, response);
+	MHD_add_response_header (response,
+			MHD_HTTP_HEADER_CONTENT_ENCODING,
+			mime);
+	ret = MHD_queue_response (connection,
+			MHD_HTTP_OK,
+			response);
+	MHD_destroy_response (response);
+	return ret;
 }
 
 
@@ -260,35 +260,35 @@ serve_simple_form (const void *cls,
  */
 static int
 fill_v1_form (const void *cls,
-	      const char *mime,
-	      struct Session *session,
-	      struct MHD_Connection *connection)
+		const char *mime,
+		struct Session *session,
+		struct MHD_Connection *connection)
 {
-  int ret;
-  const char* form = (const char*)cls;
-  char *reply;
-  struct MHD_Response *response;
+	int ret;
+	const char* form = (const char*)cls;
+	char *reply;
+	struct MHD_Response *response;
 
-  if (-1 == asprintf (&reply,
-		      form,
-		      session->value_1))
-    {
-      /* oops */
-      return MHD_NO;
-    }
-  /* return static form */
-  response = MHD_create_response_from_buffer (strlen (reply),
-					      (void *) reply,
-					      MHD_RESPMEM_MUST_FREE);
-  add_session_cookie (session, response);
-  MHD_add_response_header (response,
-			   MHD_HTTP_HEADER_CONTENT_ENCODING,
-			   mime);
-  ret = MHD_queue_response (connection,
-			    MHD_HTTP_OK,
-			    response);
-  MHD_destroy_response (response);
-  return ret;
+	if (-1 == asprintf (&reply,
+			form,
+			session->value_1))
+	{
+		/* oops */
+		return MHD_NO;
+	}
+	/* return static form */
+	response = MHD_create_response_from_buffer (strlen (reply),
+			(void *) reply,
+			MHD_RESPMEM_MUST_FREE);
+	add_session_cookie (session, response);
+	MHD_add_response_header (response,
+			MHD_HTTP_HEADER_CONTENT_ENCODING,
+			mime);
+	ret = MHD_queue_response (connection,
+			MHD_HTTP_OK,
+			response);
+	MHD_destroy_response (response);
+	return ret;
 }
 
 
@@ -302,36 +302,36 @@ fill_v1_form (const void *cls,
  */
 static int
 fill_v1_v2_form (const void *cls,
-		 const char *mime,
-		 struct Session *session,
-		 struct MHD_Connection *connection)
+		const char *mime,
+		struct Session *session,
+		struct MHD_Connection *connection)
 {
-  int ret;
-  const char* form = (const char*)cls;
-  char *reply;
-  struct MHD_Response *response;
+	int ret;
+	const char* form = (const char*)cls;
+	char *reply;
+	struct MHD_Response *response;
 
-  if (-1 == asprintf (&reply,
-		      form,
-		      session->value_1,
-		      session->value_2))
-    {
-      /* oops */
-      return MHD_NO;
-    }
-  /* return static form */
-  response = MHD_create_response_from_buffer (strlen (reply),
-					      (void *) reply,
-					      MHD_RESPMEM_MUST_FREE);
-  add_session_cookie (session, response);
-  MHD_add_response_header (response,
-			   MHD_HTTP_HEADER_CONTENT_ENCODING,
-			   mime);
-  ret = MHD_queue_response (connection,
-			    MHD_HTTP_OK,
-			    response);
-  MHD_destroy_response (response);
-  return ret;
+	if (-1 == asprintf (&reply,
+			form,
+			session->value_1,
+			session->value_2))
+	{
+		/* oops */
+		return MHD_NO;
+	}
+	/* return static form */
+	response = MHD_create_response_from_buffer (strlen (reply),
+			(void *) reply,
+			MHD_RESPMEM_MUST_FREE);
+	add_session_cookie (session, response);
+	MHD_add_response_header (response,
+			MHD_HTTP_HEADER_CONTENT_ENCODING,
+			mime);
+	ret = MHD_queue_response (connection,
+			MHD_HTTP_OK,
+			response);
+	MHD_destroy_response (response);
+	return ret;
 }
 
 
@@ -349,22 +349,22 @@ not_found_page (const void* /*cls*/,
 		struct Session* /*session*/,
 		struct MHD_Connection *connection)
 {
-  int ret;
-  struct MHD_Response *response;
+	int ret;
+	struct MHD_Response *response;
 
-  const std::string page_source = getPageSource(PageSource::not_found_error);
-  /* unsupported HTTP method */
-  response = MHD_create_response_from_buffer (page_source.size(),
-					      const_cast<char*> (page_source.c_str()),
-					      MHD_RESPMEM_PERSISTENT);
-  ret = MHD_queue_response (connection,
-			    MHD_HTTP_NOT_FOUND,
-			    response);
-  MHD_add_response_header (response,
-			   MHD_HTTP_HEADER_CONTENT_ENCODING,
-			   mime);
-  MHD_destroy_response (response);
-  return ret;
+	const std::string page_source = getPageSource(PageSource::not_found_error);
+	/* unsupported HTTP method */
+	response = MHD_create_response_from_buffer (page_source.size(),
+			const_cast<char*> (page_source.c_str()),
+			MHD_RESPMEM_PERSISTENT);
+	ret = MHD_queue_response (connection,
+			MHD_HTTP_NOT_FOUND,
+			response);
+	MHD_add_response_header (response,
+			MHD_HTTP_HEADER_CONTENT_ENCODING,
+			mime);
+	MHD_destroy_response (response);
+	return ret;
 }
 
 
@@ -372,13 +372,13 @@ not_found_page (const void* /*cls*/,
  * List of all pages served by this HTTP server.
  */
 static struct Page pages[] =
-  {
-    { "/", "text/html",  &fill_v1_form, PageSource::main_page },
-    { "/2", "text/html", &fill_v1_v2_form, PageSource::second_page },
-    { "/S", "text/html", &serve_simple_form, PageSource::submit_page },
-    { "/F", "text/html", &serve_simple_form, PageSource::last_page },
-    { nullptr, nullptr, &not_found_page, PageSource::not_found_error } /* 404 */
-  };
+{
+		{ "/", "text/html",  &fill_v1_form, PageSource::main_page },
+		{ "/2", "text/html", &fill_v1_v2_form, PageSource::second_page },
+		{ "/S", "text/html", &serve_simple_form, PageSource::submit_page },
+		{ "/F", "text/html", &serve_simple_form, PageSource::last_page },
+		{ nullptr, nullptr, &not_found_page, PageSource::not_found_error } /* 404 */
+};
 
 
 
@@ -403,49 +403,49 @@ static struct Page pages[] =
  */
 static int
 post_iterator (void *cls,
-	       enum MHD_ValueKind /*kind*/,
-	       const char *key,
-	       const char* /*filename*/,
-	       const char* /*content_type*/,
-	       const char* /*transfer_encoding*/,
-	       const char *data, uint64_t off, size_t size)
+		enum MHD_ValueKind /*kind*/,
+		const char *key,
+		const char* /*filename*/,
+		const char* /*content_type*/,
+		const char* /*transfer_encoding*/,
+		const char *data, uint64_t off, size_t size)
 {
-  struct Request *request = (Request*)cls;
-  struct Session *session = request->session;
+	struct Request *request = (Request*)cls;
+	struct Session *session = request->session;
 
-  if (0 == strcmp ("DONE", key))
-    {
-      fprintf (stdout,
-	       "Session `%s' submitted `%s', `%s'\n",
-	       session->sid,
-	       session->value_1,
-	       session->value_2);
-      return MHD_YES;
-    }
-  if (0 == strcmp ("v1", key))
-    {
-      if (size + off > sizeof(session->value_1))
-	size = sizeof (session->value_1) - off;
-      memcpy (&session->value_1[off],
-	      data,
-	      size);
-      if (size + off < sizeof (session->value_1))
-	session->value_1[size+off] = '\0';
-      return MHD_YES;
-    }
-  if (0 == strcmp ("v2", key))
-    {
-      if (size + off > sizeof(session->value_2))
-	size = sizeof (session->value_2) - off;
-      memcpy (&session->value_2[off],
-	      data,
-	      size);
-      if (size + off < sizeof (session->value_2))
-	session->value_2[size+off] = '\0';
-      return MHD_YES;
-    }
-  fprintf (stderr, "Unsupported form value `%s'\n", key);
-  return MHD_YES;
+	if (0 == strcmp ("DONE", key))
+	{
+		fprintf (stdout,
+				"Session `%s' submitted `%s', `%s'\n",
+				session->sid,
+				session->value_1,
+				session->value_2);
+		return MHD_YES;
+	}
+	if (0 == strcmp ("v1", key))
+	{
+		if (size + off > sizeof(session->value_1))
+			size = sizeof (session->value_1) - off;
+		memcpy (&session->value_1[off],
+				data,
+				size);
+		if (size + off < sizeof (session->value_1))
+			session->value_1[size+off] = '\0';
+		return MHD_YES;
+	}
+	if (0 == strcmp ("v2", key))
+	{
+		if (size + off > sizeof(session->value_2))
+			size = sizeof (session->value_2) - off;
+		memcpy (&session->value_2[off],
+				data,
+				size);
+		if (size + off < sizeof (session->value_2))
+			session->value_2[size+off] = '\0';
+		return MHD_YES;
+	}
+	fprintf (stderr, "Unsupported form value `%s'\n", key);
+	return MHD_YES;
 }
 
 
@@ -485,101 +485,101 @@ post_iterator (void *cls,
  */
 static int
 create_response (void* /*cls*/,
-		 struct MHD_Connection *connection,
-		 const char *url,
-		 const char *method,
-		 const char* /*version*/,
-		 const char *upload_data,
-		 size_t *upload_data_size,
-		 void **ptr)
+		struct MHD_Connection *connection,
+		const char *url,
+		const char *method,
+		const char* /*version*/,
+		const char *upload_data,
+		size_t *upload_data_size,
+		void **ptr)
 {
-  struct MHD_Response *response;
-  struct Request *request;
-  struct Session *session;
-  int ret;
-  unsigned int i;
+	struct MHD_Response *response;
+	struct Request *request;
+	struct Session *session;
+	int ret;
+	unsigned int i;
 
-  request = *(Request**)ptr;
-  if (nullptr == request)
-    {
-      request = new (std::nothrow) Request();
-      if (nullptr == request)
+	request = *(Request**)ptr;
+	if (nullptr == request)
 	{
-	  fprintf (stderr, "memory error: %s\n", strerror (errno));
-	  return MHD_NO;
+		request = new (std::nothrow) Request();
+		if (nullptr == request)
+		{
+			fprintf (stderr, "memory error: %s\n", strerror (errno));
+			return MHD_NO;
+		}
+		*ptr = request;
+		if (0 == strcmp (method, MHD_HTTP_METHOD_POST))
+		{
+			request->pp = MHD_create_post_processor (connection, 1024,
+					&post_iterator, request);
+			if (nullptr == request->pp)
+			{
+				fprintf (stderr, "Failed to setup post processor for `%s'\n",
+						url);
+				return MHD_NO; /* internal error */
+			}
+		}
+		return MHD_YES;
 	}
-      *ptr = request;
-      if (0 == strcmp (method, MHD_HTTP_METHOD_POST))
+	if (nullptr == request->session)
 	{
-	  request->pp = MHD_create_post_processor (connection, 1024,
-						   &post_iterator, request);
-	  if (nullptr == request->pp)
-	    {
-	      fprintf (stderr, "Failed to setup post processor for `%s'\n",
-		       url);
-	      return MHD_NO; /* internal error */
-	    }
+		request->session = get_session (connection);
+		if (nullptr == request->session)
+		{
+			fprintf (stderr, "Failed to setup session for `%s'\n",
+					url);
+			return MHD_NO; /* internal error */
+		}
 	}
-      return MHD_YES;
-    }
-  if (nullptr == request->session)
-    {
-      request->session = get_session (connection);
-      if (nullptr == request->session)
+	session = request->session;
+	session->start = time (nullptr);
+	if (0 == strcmp (method, MHD_HTTP_METHOD_POST))
 	{
-	  fprintf (stderr, "Failed to setup session for `%s'\n",
-		   url);
-	  return MHD_NO; /* internal error */
+		/* evaluate POST data */
+		MHD_post_process (request->pp,
+				upload_data,
+				*upload_data_size);
+		if (0 != *upload_data_size)
+		{
+			*upload_data_size = 0;
+			return MHD_YES;
+		}
+		/* done with POST data, serve response */
+		MHD_destroy_post_processor (request->pp);
+		request->pp = nullptr;
+		method = MHD_HTTP_METHOD_GET; /* fake 'GET' */
+		if (nullptr != request->post_url)
+			url = request->post_url;
 	}
-    }
-  session = request->session;
-  session->start = time (nullptr);
-  if (0 == strcmp (method, MHD_HTTP_METHOD_POST))
-    {
-      /* evaluate POST data */
-      MHD_post_process (request->pp,
-			upload_data,
-			*upload_data_size);
-      if (0 != *upload_data_size)
-	{
-	  *upload_data_size = 0;
-	  return MHD_YES;
-	}
-      /* done with POST data, serve response */
-      MHD_destroy_post_processor (request->pp);
-      request->pp = nullptr;
-      method = MHD_HTTP_METHOD_GET; /* fake 'GET' */
-      if (nullptr != request->post_url)
-	url = request->post_url;
-    }
 
-  if ( (0 == strcmp (method, MHD_HTTP_METHOD_GET)) ||
-       (0 == strcmp (method, MHD_HTTP_METHOD_HEAD)) )
-    {
-      /* find out which page to serve */
-      i=0;
-      while ( (pages[i].url != nullptr) &&
-	      (0 != strcmp (pages[i].url, url)) )
-	i++;
-      const std::string source = getPageSource(pages[i].source);
-      ret = pages[i].handler (source.c_str(),
-			      pages[i].mime,
-			      session, connection);
-      if (ret != MHD_YES)
-	fprintf (stderr, "Failed to create page for `%s'\n",
-		 url);
-      return ret;
-    }
-  /* unsupported HTTP method */
-  const std::string error_source = getPageSource(PageSource::method_error);
-  response = MHD_create_response_from_buffer (error_source.size(),
-					      const_cast<char*>(error_source.c_str()),
-					      MHD_RESPMEM_PERSISTENT);
-  ret = MHD_queue_response (connection,
-			    MHD_HTTP_METHOD_NOT_ACCEPTABLE,
-			    response);
-  MHD_destroy_response (response);
-  return ret;
+	if ( (0 == strcmp (method, MHD_HTTP_METHOD_GET)) ||
+			(0 == strcmp (method, MHD_HTTP_METHOD_HEAD)) )
+	{
+		/* find out which page to serve */
+		i=0;
+		while ( (pages[i].url != nullptr) &&
+				(0 != strcmp (pages[i].url, url)) )
+			i++;
+		const std::string source = getPageSource(pages[i].source);
+		ret = pages[i].handler (source.c_str(),
+				pages[i].mime,
+				session, connection);
+		if (ret != MHD_YES)
+			fprintf (stderr, "Failed to create page for `%s'\n",
+					url);
+		return ret;
+	}
+	/* unsupported HTTP method */
+	const std::string error_source = getPageSource(PageSource::method_error);
+	response = MHD_create_response_from_buffer (error_source.size(),
+			const_cast<char*>(error_source.c_str()),
+			MHD_RESPMEM_PERSISTENT);
+	ret = MHD_queue_response (connection,
+			MHD_HTTP_METHOD_NOT_ACCEPTABLE,
+			response);
+	MHD_destroy_response (response);
+	return ret;
 }
 
 
@@ -594,19 +594,19 @@ create_response (void* /*cls*/,
  */
 static void
 request_completed_callback (void* /*cls*/,
-			    struct MHD_Connection* /*connection*/,
-			    void **con_cls,
-			    enum MHD_RequestTerminationCode /*toe*/)
+		struct MHD_Connection* /*connection*/,
+		void **con_cls,
+		enum MHD_RequestTerminationCode /*toe*/)
 {
-  struct Request *request = *(Request**)con_cls;
+	struct Request *request = *(Request**)con_cls;
 
-  if (nullptr == request)
-    return;
-  if (nullptr != request->session)
-    request->session->rc--;
-  if (nullptr != request->pp)
-    MHD_destroy_post_processor (request->pp);
-  delete request;
+	if (nullptr == request)
+		return;
+	if (nullptr != request->session)
+		request->session->rc--;
+	if (nullptr != request->pp)
+		MHD_destroy_post_processor (request->pp);
+	delete request;
 }
 
 
@@ -617,30 +617,30 @@ request_completed_callback (void* /*cls*/,
 static void
 expire_sessions ()
 {
-  struct Session *pos;
-  struct Session *prev;
-  struct Session *next;
-  time_t now;
+	struct Session *pos;
+	struct Session *prev;
+	struct Session *next;
+	time_t now;
 
-  now = time (nullptr);
-  prev = nullptr;
-  pos = sessions;
-  while (nullptr != pos)
-    {
-      next = pos->next;
-      if (now - pos->start > 60 * 60)
+	now = time (nullptr);
+	prev = nullptr;
+	pos = sessions;
+	while (nullptr != pos)
 	{
-	  /* expire sessions after 1h */
-	  if (nullptr == prev)
-	    sessions = pos->next;
-	  else
-	    prev->next = next;
-	  delete pos;
+		next = pos->next;
+		if (now - pos->start > 60 * 60)
+		{
+			/* expire sessions after 1h */
+			if (nullptr == prev)
+				sessions = pos->next;
+			else
+				prev->next = next;
+			delete pos;
+		}
+		else
+			prev = pos;
+		pos = next;
 	}
-      else
-        prev = pos;
-      pos = next;
-    }
 }
 
 
@@ -651,58 +651,58 @@ expire_sessions ()
 int
 main (int argc, char *const *argv)
 {
-  struct MHD_Daemon *d;
-  struct timeval tv;
-  struct timeval *tvp;
-  fd_set rs;
-  fd_set ws;
-  fd_set es;
-  MHD_socket max;
-  MHD_UNSIGNED_LONG_LONG mhd_timeout;
+	struct MHD_Daemon *d;
+	struct timeval tv;
+	struct timeval *tvp;
+	fd_set rs;
+	fd_set ws;
+	fd_set es;
+	MHD_socket max;
+	MHD_UNSIGNED_LONG_LONG mhd_timeout;
 
-  if (argc != 2)
-    {
-      printf ("%s PORT\n", argv[0]);
-      return 1;
-    }
-  /* initialize PRNG */
-  srand ((unsigned int) time (nullptr));
-  d = MHD_start_daemon (MHD_USE_DEBUG,
-                        atoi (argv[1]),
-                        nullptr, nullptr,
+	if (argc != 2)
+	{
+		printf ("%s PORT\n", argv[0]);
+		return 1;
+	}
+	/* initialize PRNG */
+	srand ((unsigned int) time (nullptr));
+	d = MHD_start_daemon (MHD_USE_DEBUG,
+			atoi (argv[1]),
+			nullptr, nullptr,
 			&create_response, nullptr,
 			MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 15,
 			MHD_OPTION_NOTIFY_COMPLETED, &request_completed_callback, nullptr,
 			MHD_OPTION_END);
-  if (nullptr == d)
-    return 1;
-  while (1)
-    {
-      expire_sessions ();
-      max = 0;
-      FD_ZERO (&rs);
-      FD_ZERO (&ws);
-      FD_ZERO (&es);
-      if (MHD_YES != MHD_get_fdset (d, &rs, &ws, &es, &max))
-	break; /* fatal internal error */
-      if (MHD_get_timeout (d, &mhd_timeout) == MHD_YES)
+	if (nullptr == d)
+		return 1;
+	while (1)
 	{
-	  tv.tv_sec = mhd_timeout / 1000;
-	  tv.tv_usec = (mhd_timeout - (tv.tv_sec * 1000)) * 1000;
-	  tvp = &tv;
+		expire_sessions ();
+		max = 0;
+		FD_ZERO (&rs);
+		FD_ZERO (&ws);
+		FD_ZERO (&es);
+		if (MHD_YES != MHD_get_fdset (d, &rs, &ws, &es, &max))
+			break; /* fatal internal error */
+			if (MHD_get_timeout (d, &mhd_timeout) == MHD_YES)
+			{
+				tv.tv_sec = mhd_timeout / 1000;
+				tv.tv_usec = (mhd_timeout - (tv.tv_sec * 1000)) * 1000;
+				tvp = &tv;
+			}
+			else
+				tvp = nullptr;
+			if (-1 == select (max + 1, &rs, &ws, &es, tvp))
+			{
+				if (EINTR != errno)
+					fprintf (stderr,
+							"Aborting due to error during select: %s\n",
+							strerror (errno));
+				break;
+			}
+			MHD_run (d);
 	}
-      else
-	tvp = nullptr;
-      if (-1 == select (max + 1, &rs, &ws, &es, tvp))
-	{
-	  if (EINTR != errno)
-	    fprintf (stderr,
-		     "Aborting due to error during select: %s\n",
-		     strerror (errno));
-	  break;
-	}
-      MHD_run (d);
-    }
-  MHD_stop_daemon (d);
-  return 0;
+	MHD_stop_daemon (d);
+	return 0;
 }
