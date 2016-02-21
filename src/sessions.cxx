@@ -1,55 +1,12 @@
 /* Feel free to use this example code in any way
    you see fit (Public Domain) */
 
-/* needed for asprintf */
-#define _GNU_SOURCE
-
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
 #include <time.h>
 #include <microhttpd.h>
-
-#if defined _WIN32 && !defined(__MINGW64_VERSION_MAJOR)
-static int
-asprintf (char **resultp, const char *format, ...)
-{
-  va_list argptr;
-  char *result = NULL;
-  int len = 0;
-
-  if (format == NULL)
-    return -1;
-
-  va_start (argptr, format);
-
-  len = _vscprintf ((char *) format, argptr);
-  if (len >= 0)
-  {
-    len += 1;
-    result = (char *) malloc (sizeof (char *) * len);
-    if (result != NULL)
-    {
-      int len2 = _vscprintf ((char *) format, argptr);
-      if (len2 != len - 1 || len2 <= 0)
-      {
-        free (result);
-        result = NULL;
-        len = -1;
-      }
-      else
-      {
-        len = len2;
-        if (resultp)
-          *resultp = result;
-      }
-    }
-  }
-  va_end (argptr);
-  return len;
-}
-#endif
 
 /**
  * Invalid method page.
@@ -191,7 +148,7 @@ get_session (struct MHD_Connection *connection)
 	}
     }
   /* create fresh session */
-  ret = calloc (1, sizeof (struct Session));
+  ret = (Session*)calloc (1, sizeof (struct Session));
   if (NULL == ret)
     {
       fprintf (stderr, "calloc error: %s\n", strerror (errno));
@@ -299,7 +256,7 @@ serve_simple_form (const void *cls,
 		   struct MHD_Connection *connection)
 {
   int ret;
-  const char *form = cls;
+  const char* form = (const char*)cls;
   struct MHD_Response *response;
 
   /* return static form */
@@ -333,7 +290,7 @@ fill_v1_form (const void *cls,
 	      struct MHD_Connection *connection)
 {
   int ret;
-  const char *form = cls;
+  const char* form = (const char*)cls;
   char *reply;
   struct MHD_Response *response;
 
@@ -375,7 +332,7 @@ fill_v1_v2_form (const void *cls,
 		 struct MHD_Connection *connection)
 {
   int ret;
-  const char *form = cls;
+  const char* form = (const char*)cls;
   char *reply;
   struct MHD_Response *response;
 
@@ -412,9 +369,9 @@ fill_v1_v2_form (const void *cls,
  * @param connection connection to use
  */
 static int
-not_found_page (const void *cls,
+not_found_page (const void* /*cls*/,
 		const char *mime,
-		struct Session *session,
+		struct Session* /*session*/,
 		struct MHD_Connection *connection)
 {
   int ret;
@@ -470,14 +427,14 @@ static struct Page pages[] =
  */
 static int
 post_iterator (void *cls,
-	       enum MHD_ValueKind kind,
+	       enum MHD_ValueKind /*kind*/,
 	       const char *key,
-	       const char *filename,
-	       const char *content_type,
-	       const char *transfer_encoding,
+	       const char* /*filename*/,
+	       const char* /*content_type*/,
+	       const char* /*transfer_encoding*/,
 	       const char *data, uint64_t off, size_t size)
 {
-  struct Request *request = cls;
+  struct Request *request = (Request*)cls;
   struct Session *session = request->session;
 
   if (0 == strcmp ("DONE", key))
@@ -551,11 +508,11 @@ post_iterator (void *cls,
  *         error while handling the request
  */
 static int
-create_response (void *cls,
+create_response (void* /*cls*/,
 		 struct MHD_Connection *connection,
 		 const char *url,
 		 const char *method,
-		 const char *version,
+		 const char* /*version*/,
 		 const char *upload_data,
 		 size_t *upload_data_size,
 		 void **ptr)
@@ -566,10 +523,10 @@ create_response (void *cls,
   int ret;
   unsigned int i;
 
-  request = *ptr;
+  request = *(Request**)ptr;
   if (NULL == request)
     {
-      request = calloc (1, sizeof (struct Request));
+      request = (Request*)calloc (1, sizeof (struct Request));
       if (NULL == request)
 	{
 	  fprintf (stderr, "calloc error: %s\n", strerror (errno));
@@ -658,12 +615,12 @@ create_response (void *cls,
  * @param toe status code
  */
 static void
-request_completed_callback (void *cls,
-			    struct MHD_Connection *connection,
+request_completed_callback (void* /*cls*/,
+			    struct MHD_Connection* /*connection*/,
 			    void **con_cls,
-			    enum MHD_RequestTerminationCode toe)
+			    enum MHD_RequestTerminationCode /*toe*/)
 {
-  struct Request *request = *con_cls;
+  struct Request *request = *(Request**)con_cls;
 
   if (NULL == request)
     return;
