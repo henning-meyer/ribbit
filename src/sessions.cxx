@@ -11,35 +11,7 @@
 #include <new>
 #include "libmhd.hxx"
 
-/**
- * Invalid method page.
- */
-#define METHOD_ERROR "<html><head><title>Illegal request</title></head><body>Go away.</body></html>"
-
-/**
- * Invalid URL page.
- */
-#define NOT_FOUND_ERROR "<html><head><title>Not found</title></head><body>Go away.</body></html>"
-
-/**
- * Front page. (/)
- */
-#define MAIN_PAGE "<html><head><title>Welcome</title></head><body><form action=\"/2\" method=\"post\">What is your name? <input type=\"text\" name=\"v1\" value=\"%s\" /><input type=\"submit\" value=\"Next\" /></body></html>"
-
-/**
- * Second page. (/2)
- */
-#define SECOND_PAGE "<html><head><title>Tell me more</title></head><body><a href=\"/\">previous</a> <form action=\"/S\" method=\"post\">%s, what is your job? <input type=\"text\" name=\"v2\" value=\"%s\" /><input type=\"submit\" value=\"Next\" /></body></html>"
-
-/**
- * Second page (/S)
- */
-#define SUBMIT_PAGE "<html><head><title>Ready to submit?</title></head><body><form action=\"/F\" method=\"post\"><a href=\"/2\">previous </a> <input type=\"hidden\" name=\"DONE\" value=\"yes\" /><input type=\"submit\" value=\"Submit\" /></body></html>"
-
-/**
- * Last page.
- */
-#define LAST_PAGE "<html><head><title>Thank you</title></head><body>Thank you.</body></html>"
+#include "pages.hxx"
 
 /**
  * Name of our cookie.
@@ -212,7 +184,7 @@ struct Page
   /**
    * Extra argument to handler.
    */
-  const void *handler_cls;
+  PageSource source;
 };
 
 
@@ -380,9 +352,10 @@ not_found_page (const void* /*cls*/,
   int ret;
   struct MHD_Response *response;
 
+  const std::string page_source = getPageSource(PageSource::not_found_error);
   /* unsupported HTTP method */
-  response = MHD_create_response_from_buffer (strlen (NOT_FOUND_ERROR),
-					      (void *) NOT_FOUND_ERROR,
+  response = MHD_create_response_from_buffer (page_source.size(),
+					      const_cast<char*> (page_source.c_str()),
 					      MHD_RESPMEM_PERSISTENT);
   ret = MHD_queue_response (connection,
 			    MHD_HTTP_NOT_FOUND,
@@ -400,11 +373,11 @@ not_found_page (const void* /*cls*/,
  */
 static struct Page pages[] =
   {
-    { "/", "text/html",  &fill_v1_form, MAIN_PAGE },
-    { "/2", "text/html", &fill_v1_v2_form, SECOND_PAGE },
-    { "/S", "text/html", &serve_simple_form, SUBMIT_PAGE },
-    { "/F", "text/html", &serve_simple_form, LAST_PAGE },
-    { nullptr, nullptr, &not_found_page, nullptr } /* 404 */
+    { "/", "text/html",  &fill_v1_form, PageSource::main_page },
+    { "/2", "text/html", &fill_v1_v2_form, PageSource::second_page },
+    { "/S", "text/html", &serve_simple_form, PageSource::submit_page },
+    { "/F", "text/html", &serve_simple_form, PageSource::last_page },
+    { nullptr, nullptr, &not_found_page, PageSource::not_found_error } /* 404 */
   };
 
 
@@ -588,7 +561,8 @@ create_response (void* /*cls*/,
       while ( (pages[i].url != nullptr) &&
 	      (0 != strcmp (pages[i].url, url)) )
 	i++;
-      ret = pages[i].handler (pages[i].handler_cls,
+      const std::string source = getPageSource(pages[i].source);
+      ret = pages[i].handler (source.c_str(),
 			      pages[i].mime,
 			      session, connection);
       if (ret != MHD_YES)
@@ -597,8 +571,9 @@ create_response (void* /*cls*/,
       return ret;
     }
   /* unsupported HTTP method */
-  response = MHD_create_response_from_buffer (strlen (METHOD_ERROR),
-					      (void *) METHOD_ERROR,
+  const std::string error_source = getPageSource(PageSource::method_error);
+  response = MHD_create_response_from_buffer (error_source.size(),
+					      const_cast<char*>(error_source.c_str()),
 					      MHD_RESPMEM_PERSISTENT);
   ret = MHD_queue_response (connection,
 			    MHD_HTTP_METHOD_NOT_ACCEPTABLE,
