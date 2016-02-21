@@ -8,6 +8,9 @@
 #include <time.h>
 #include <microhttpd.h>
 
+#include <new>
+#include "libmhd.hxx"
+
 /**
  * Invalid method page.
  */
@@ -52,33 +55,33 @@ struct Session
   /**
    * We keep all sessions in a linked list.
    */
-  struct Session *next;
+  struct Session *next = nullptr;
 
   /**
    * Unique ID for this session.
    */
-  char sid[33];
+  char sid[33] = {0};
 
   /**
    * Reference counter giving the number of connections
    * currently using this session.
    */
-  unsigned int rc;
+  unsigned int rc = 0;
 
   /**
    * Time when this session was last active.
    */
-  time_t start;
+  time_t start = 0;
 
   /**
    * String submitted via form.
    */
-  char value_1[64];
+  char value_1[64] = {0};
 
   /**
    * Another value submitted via form.
    */
-  char value_2[64];
+  char value_2[64] = {0};
 
 };
 
@@ -92,19 +95,19 @@ struct Request
   /**
    * Associated session.
    */
-  struct Session *session;
+  Session* session = nullptr;
 
   /**
    * Post processor handling form data (IF this is
    * a POST request).
    */
-  struct MHD_PostProcessor *pp;
+  mhd::PostProcessor* pp = nullptr;
 
   /**
    * URL to serve in response to this POST (if this request
    * was a 'POST')
    */
-  const char *post_url;
+  const char* post_url = nullptr;
 
 };
 
@@ -113,7 +116,7 @@ struct Request
  * Linked list of all active sessions.  Yes, O(n) but a
  * hash table would be overkill for a simple example...
  */
-static struct Session *sessions;
+static struct Session *sessions = nullptr;
 
 
 
@@ -123,7 +126,7 @@ static struct Session *sessions;
  * create one if this is a new user.
  */
 static struct Session *
-get_session (struct MHD_Connection *connection)
+get_session (mhd::Connection* connection)
 {
   struct Session *ret;
   const char *cookie;
@@ -131,28 +134,28 @@ get_session (struct MHD_Connection *connection)
   cookie = MHD_lookup_connection_value (connection,
 					MHD_COOKIE_KIND,
 					COOKIE_NAME);
-  if (cookie != NULL)
+  if (cookie != nullptr)
     {
       /* find existing session */
       ret = sessions;
-      while (NULL != ret)
+      while (nullptr != ret)
 	{
 	  if (0 == strcmp (cookie, ret->sid))
 	    break;
 	  ret = ret->next;
 	}
-      if (NULL != ret)
+      if (nullptr != ret)
 	{
 	  ret->rc++;
 	  return ret;
 	}
     }
   /* create fresh session */
-  ret = (Session*)calloc (1, sizeof (struct Session));
-  if (NULL == ret)
+  ret = new (std::nothrow) Session();
+  if (nullptr == ret)
     {
-      fprintf (stderr, "calloc error: %s\n", strerror (errno));
-      return NULL;
+      fprintf (stderr, "memory error: %s\n", strerror (errno));
+      return nullptr;
     }
   /* not a super-secure way to generate a random session ID,
      but should do for a simple example... */
@@ -164,7 +167,7 @@ get_session (struct MHD_Connection *connection)
 	    (unsigned int) rand (),
 	    (unsigned int) rand ());
   ret->rc++;
-  ret->start = time (NULL);
+  ret->start = time (nullptr);
   ret->next = sessions;
   sessions = ret;
   return ret;
@@ -221,7 +224,7 @@ struct Page
  */
 static void
 add_session_cookie (struct Session *session,
-		    struct MHD_Response *response)
+		    mhd::Response *response)
 {
   char cstr[256];
   snprintf (cstr,
@@ -253,11 +256,11 @@ static int
 serve_simple_form (const void *cls,
 		   const char *mime,
 		   struct Session *session,
-		   struct MHD_Connection *connection)
+		   mhd::Connection *connection)
 {
   int ret;
   const char* form = (const char*)cls;
-  struct MHD_Response *response;
+  mhd::Response* response;
 
   /* return static form */
   response = MHD_create_response_from_buffer (strlen (form),
@@ -401,7 +404,7 @@ static struct Page pages[] =
     { "/2", "text/html", &fill_v1_v2_form, SECOND_PAGE },
     { "/S", "text/html", &serve_simple_form, SUBMIT_PAGE },
     { "/F", "text/html", &serve_simple_form, LAST_PAGE },
-    { NULL, NULL, &not_found_page, NULL } /* 404 */
+    { nullptr, nullptr, &not_found_page, nullptr } /* 404 */
   };
 
 
@@ -415,9 +418,9 @@ static struct Page pages[] =
  * @param cls user-specified closure
  * @param kind type of the value
  * @param key 0-terminated key for the value
- * @param filename name of the uploaded file, NULL if not known
- * @param content_type mime-type of the data, NULL if not known
- * @param transfer_encoding encoding of the data, NULL if not known
+ * @param filename name of the uploaded file, nullptr if not known
+ * @param content_type mime-type of the data, nullptr if not known
+ * @param transfer_encoding encoding of the data, nullptr if not known
  * @param data pointer to size bytes of data at the
  *              specified offset
  * @param off offset of data in the overall value
@@ -502,7 +505,7 @@ post_iterator (void *cls,
  *        If necessary, this state can be cleaned up in the
  *        global "MHD_RequestCompleted" callback (which
  *        can be set with the MHD_OPTION_NOTIFY_COMPLETED).
- *        Initially, <tt>*con_cls</tt> will be NULL.
+ *        Initially, <tt>*con_cls</tt> will be nullptr.
  * @return MHS_YES if the connection was handled successfully,
  *         MHS_NO if the socket must be closed due to a serios
  *         error while handling the request
@@ -524,12 +527,12 @@ create_response (void* /*cls*/,
   unsigned int i;
 
   request = *(Request**)ptr;
-  if (NULL == request)
+  if (nullptr == request)
     {
-      request = (Request*)calloc (1, sizeof (struct Request));
-      if (NULL == request)
+      request = new (std::nothrow) Request();
+      if (nullptr == request)
 	{
-	  fprintf (stderr, "calloc error: %s\n", strerror (errno));
+	  fprintf (stderr, "memory error: %s\n", strerror (errno));
 	  return MHD_NO;
 	}
       *ptr = request;
@@ -537,7 +540,7 @@ create_response (void* /*cls*/,
 	{
 	  request->pp = MHD_create_post_processor (connection, 1024,
 						   &post_iterator, request);
-	  if (NULL == request->pp)
+	  if (nullptr == request->pp)
 	    {
 	      fprintf (stderr, "Failed to setup post processor for `%s'\n",
 		       url);
@@ -546,10 +549,10 @@ create_response (void* /*cls*/,
 	}
       return MHD_YES;
     }
-  if (NULL == request->session)
+  if (nullptr == request->session)
     {
       request->session = get_session (connection);
-      if (NULL == request->session)
+      if (nullptr == request->session)
 	{
 	  fprintf (stderr, "Failed to setup session for `%s'\n",
 		   url);
@@ -557,7 +560,7 @@ create_response (void* /*cls*/,
 	}
     }
   session = request->session;
-  session->start = time (NULL);
+  session->start = time (nullptr);
   if (0 == strcmp (method, MHD_HTTP_METHOD_POST))
     {
       /* evaluate POST data */
@@ -571,9 +574,9 @@ create_response (void* /*cls*/,
 	}
       /* done with POST data, serve response */
       MHD_destroy_post_processor (request->pp);
-      request->pp = NULL;
+      request->pp = nullptr;
       method = MHD_HTTP_METHOD_GET; /* fake 'GET' */
-      if (NULL != request->post_url)
+      if (nullptr != request->post_url)
 	url = request->post_url;
     }
 
@@ -582,7 +585,7 @@ create_response (void* /*cls*/,
     {
       /* find out which page to serve */
       i=0;
-      while ( (pages[i].url != NULL) &&
+      while ( (pages[i].url != nullptr) &&
 	      (0 != strcmp (pages[i].url, url)) )
 	i++;
       ret = pages[i].handler (pages[i].handler_cls,
@@ -622,13 +625,13 @@ request_completed_callback (void* /*cls*/,
 {
   struct Request *request = *(Request**)con_cls;
 
-  if (NULL == request)
+  if (nullptr == request)
     return;
-  if (NULL != request->session)
+  if (nullptr != request->session)
     request->session->rc--;
-  if (NULL != request->pp)
+  if (nullptr != request->pp)
     MHD_destroy_post_processor (request->pp);
-  free (request);
+  delete request;
 }
 
 
@@ -644,20 +647,20 @@ expire_sessions ()
   struct Session *next;
   time_t now;
 
-  now = time (NULL);
-  prev = NULL;
+  now = time (nullptr);
+  prev = nullptr;
   pos = sessions;
-  while (NULL != pos)
+  while (nullptr != pos)
     {
       next = pos->next;
       if (now - pos->start > 60 * 60)
 	{
 	  /* expire sessions after 1h */
-	  if (NULL == prev)
+	  if (nullptr == prev)
 	    sessions = pos->next;
 	  else
 	    prev->next = next;
-	  free (pos);
+	  delete pos;
 	}
       else
         prev = pos;
@@ -688,15 +691,15 @@ main (int argc, char *const *argv)
       return 1;
     }
   /* initialize PRNG */
-  srand ((unsigned int) time (NULL));
+  srand ((unsigned int) time (nullptr));
   d = MHD_start_daemon (MHD_USE_DEBUG,
                         atoi (argv[1]),
-                        NULL, NULL,
-			&create_response, NULL,
+                        nullptr, nullptr,
+			&create_response, nullptr,
 			MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 15,
-			MHD_OPTION_NOTIFY_COMPLETED, &request_completed_callback, NULL,
+			MHD_OPTION_NOTIFY_COMPLETED, &request_completed_callback, nullptr,
 			MHD_OPTION_END);
-  if (NULL == d)
+  if (nullptr == d)
     return 1;
   while (1)
     {
@@ -714,7 +717,7 @@ main (int argc, char *const *argv)
 	  tvp = &tv;
 	}
       else
-	tvp = NULL;
+	tvp = nullptr;
       if (-1 == select (max + 1, &rs, &ws, &es, tvp))
 	{
 	  if (EINTR != errno)
