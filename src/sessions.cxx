@@ -100,32 +100,30 @@ static struct Session *sessions = nullptr;
 static struct Session *
 get_session (mhd::Connection* connection)
 {
-	struct Session *ret;
-	const char *cookie;
-
-	cookie = MHD_lookup_connection_value (connection,
+	const char* cookie = MHD_lookup_connection_value (connection,
 			MHD_COOKIE_KIND,
 			COOKIE_NAME.c_str());
-	if (cookie != nullptr)
-	{
+	if (cookie != nullptr) {
+
 		/* find existing session */
-		ret = sessions;
-		while (nullptr != ret)
-		{
-			if (0 == strcmp (cookie, ret->sid))
+		Session* ses = sessions;
+		while (nullptr != ses) {
+
+			if (0 == strcmp (cookie, ses->sid)) {
 				break;
-			ret = ret->next;
+			}
+			ses = ses->next;
 		}
-		if (nullptr != ret)
-		{
-			ret->rc++;
-			return ret;
+		if (nullptr != ses) {
+
+			ses->rc++;
+			return ses;
 		}
 	}
 	/* create fresh session */
-	ret = new (std::nothrow) Session();
-	if (nullptr == ret)
-	{
+	Session *ret = new (std::nothrow) Session();
+	if (nullptr == ret) {
+
 		fprintf (stderr, "memory error: %s\n", strerror (errno));
 		return nullptr;
 	}
@@ -155,7 +153,7 @@ get_session (mhd::Connection* connection)
  * @param connection connection to process
  * @param MHD_YES on success, MHD_NO on failure
  */
-typedef int (*PageHandler)(const void *cls,
+typedef int (*PageHandler)(const char* cls,
 		const char *mime,
 		struct Session *session,
 		mhd::Connection* connection);
@@ -195,8 +193,8 @@ struct Page
  * @param response response to modify
  */
 static void
-add_session_cookie (struct Session *session,
-		mhd::Response *response)
+add_session_cookie (Session* session,
+		mhd::Response* response)
 {
 	char cstr[256];
 	snprintf (cstr,
@@ -204,7 +202,7 @@ add_session_cookie (struct Session *session,
 			"%s=%s",
 			COOKIE_NAME.c_str(),
 			session->sid);
-	if (MHD_NO ==
+	if (mhd::no ==
 			MHD_add_response_header (response,
 					mhd::http_header::set_cookie.c_str(),
 					cstr))
@@ -225,25 +223,22 @@ add_session_cookie (struct Session *session,
  * @param connection connection to use
  */
 static int
-serve_simple_form (const void *cls,
+serve_simple_form (const char* form,
 		const char *mime,
 		struct Session *session,
 		mhd::Connection *connection)
 {
-	int ret;
-	const char* form = (const char*)cls;
-	mhd::Response* response;
 
 	/* return static form */
-	response = MHD_create_response_from_buffer (strlen (form),
+	mhd::Response* response = MHD_create_response_from_buffer (strlen (form),
 			(void *) form,
 			MHD_RESPMEM_PERSISTENT);
 	add_session_cookie (session, response);
 	MHD_add_response_header (response,
-			MHD_HTTP_HEADER_CONTENT_ENCODING,
+			mhd::http_header::content_encoding.c_str(),
 			mime);
-	ret = MHD_queue_response (connection,
-			MHD_HTTP_OK,
+	int ret = MHD_queue_response (connection,
+			mhd::http_ok,
 			response);
 	MHD_destroy_response (response);
 	return ret;
@@ -259,33 +254,33 @@ serve_simple_form (const void *cls,
  * @param connection connection to use
  */
 static int
-fill_v1_form (const void *cls,
+fill_v1_form (const char* form,
 		const char *mime,
 		struct Session *session,
-		struct MHD_Connection *connection)
+		mhd::Connection* connection)
 {
-	int ret;
-	const char* form = (const char*)cls;
+
+
 	char *reply;
-	mhd::Response* response;
+
 
 	if (-1 == asprintf (&reply,
 			form,
 			session->value_1))
 	{
 		/* oops */
-		return MHD_NO;
+		return mhd::no;
 	}
 	/* return static form */
-	response = MHD_create_response_from_buffer (strlen (reply),
+	mhd::Response* response = MHD_create_response_from_buffer (strlen (reply),
 			(void *) reply,
 			MHD_RESPMEM_MUST_FREE);
 	add_session_cookie (session, response);
 	MHD_add_response_header (response,
-			MHD_HTTP_HEADER_CONTENT_ENCODING,
+			mhd::http_header::content_encoding.c_str(),
 			mime);
-	ret = MHD_queue_response (connection,
-			MHD_HTTP_OK,
+	int ret = MHD_queue_response (connection,
+			mhd::http_ok,
 			response);
 	MHD_destroy_response (response);
 	return ret;
@@ -301,13 +296,12 @@ fill_v1_form (const void *cls,
  * @param connection connection to use
  */
 static int
-fill_v1_v2_form (const void *cls,
+fill_v1_v2_form (const char* form,
 		const char *mime,
 		struct Session *session,
 		mhd::Connection* connection)
 {
-	int ret;
-	const char* form = (const char*)cls;
+
 	char *reply;
 	mhd::Response* response;
 
@@ -317,7 +311,7 @@ fill_v1_v2_form (const void *cls,
 			session->value_2))
 	{
 		/* oops */
-		return MHD_NO;
+		return mhd::no;
 	}
 	/* return static form */
 	response = MHD_create_response_from_buffer (strlen (reply),
@@ -327,8 +321,8 @@ fill_v1_v2_form (const void *cls,
 	MHD_add_response_header (response,
 			mhd::http_header::content_encoding.c_str(),
 			mime);
-	ret = MHD_queue_response (connection,
-			MHD_HTTP_OK,
+	int ret = MHD_queue_response (connection,
+			mhd::http_ok,
 			response);
 	MHD_destroy_response (response);
 	return ret;
@@ -344,24 +338,22 @@ fill_v1_v2_form (const void *cls,
  * @param connection connection to use
  */
 static int
-not_found_page (const void* /*cls*/,
+not_found_page (const char* /*cls*/,
 		const char *mime,
 		struct Session* /*session*/,
-		struct MHD_Connection *connection)
+		mhd::Connection* connection)
 {
-	int ret;
-	mhd::Response* response;
 
 	const std::string page_source = getPageSource(PageSource::not_found_error);
 	/* unsupported HTTP method */
-	response = MHD_create_response_from_buffer (page_source.size(),
+	mhd::Response* response = MHD_create_response_from_buffer (page_source.size(),
 			const_cast<char*> (page_source.c_str()),
 			MHD_RESPMEM_PERSISTENT);
-	ret = MHD_queue_response (connection,
-			MHD_HTTP_NOT_FOUND,
+	int ret = MHD_queue_response (connection,
+			mhd::http_not_found,
 			response);
 	MHD_add_response_header (response,
-			MHD_HTTP_HEADER_CONTENT_ENCODING,
+			mhd::http_header::content_encoding.c_str(),
 			mime);
 	MHD_destroy_response (response);
 	return ret;
@@ -413,7 +405,8 @@ post_iterator (void *cls,
 	struct Request *request = (Request*)cls;
 	struct Session *session = request->session;
 
-	if (0 == strcmp ("DONE", key))
+	const std::string done = "DONE";
+	if (done == key)
 	{
 		fprintf (stdout,
 				"Session `%s' submitted `%s', `%s'\n",
@@ -422,26 +415,27 @@ post_iterator (void *cls,
 				session->value_2);
 		return mhd::yes;
 	}
-	if (0 == strcmp ("v1", key))
-	{
-		if (size + off > sizeof(session->value_1))
-			size = sizeof (session->value_1) - off;
-		memcpy (&session->value_1[off],
-				data,
-				size);
-		if (size + off < sizeof (session->value_1))
-			session->value_1[size+off] = '\0';
+	const std::string v1 = "v1";
+	const std::string v2 = "v2";
+	if (v1 == key) {
+
+		if (size + off >= sizeof(session->value_1)) {
+			size = sizeof (session->value_1) -1- off;
+		}
+		memcpy (&session->value_1[off], data, size);
+		session->value_1[size+off] = '\0';
+
 		return mhd::yes;
 	}
-	if (0 == strcmp ("v2", key))
-	{
-		if (size + off > sizeof(session->value_2))
-			size = sizeof (session->value_2) - off;
-		memcpy (&session->value_2[off],
-				data,
-				size);
-		if (size + off < sizeof (session->value_2))
-			session->value_2[size+off] = '\0';
+
+	if (v2 == key) {
+
+		if (size + off >= sizeof(session->value_2)) {
+			size = sizeof (session->value_2)-1 - off;
+		}
+		memcpy (&session->value_2[off], data, size);
+		session->value_2[size+off] = '\0';
+
 		return mhd::yes;
 	}
 	fprintf (stderr, "Unsupported form value `%s'\n", key);
@@ -591,9 +585,9 @@ create_response (void* /*cls*/,
  */
 static void
 request_completed_callback (void* /*cls*/,
-		struct MHD_Connection* /*connection*/,
+		mhd::Connection* /*connection*/,
 		void **con_cls,
-		enum MHD_RequestTerminationCode /*toe*/)
+		mhd::RequestTerminationCode /*toe*/)
 {
 	struct Request *request = *(Request**)con_cls;
 
