@@ -1,6 +1,8 @@
 /* Feel free to use this example code in any way
    you see fit (Public Domain) */
 
+#include "sessions.hxx"
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -9,95 +11,26 @@
 #include <microhttpd.h>
 
 #include <new>
-#include "libmhd.hxx"
-
-#include "pages.hxx"
 
 /**
  * Name of our cookie.
  */
 static const std::string COOKIE_NAME = "session";
 
-
-/**
- * State we keep for each user/session/browser.
- */
-struct Session
-{
-	/**
-	 * We keep all sessions in a linked list.
-	 */
-	struct Session *next = nullptr;
-
-	/**
-	 * Unique ID for this session.
-	 */
-	char sid[33] = {0};
-
-	/**
-	 * Reference counter giving the number of connections
-	 * currently using this session.
-	 */
-	unsigned int rc = 0;
-
-	/**
-	 * Time when this session was last active.
-	 */
-	time_t start = 0;
-
-	/**
-	 * String submitted via form.
-	 */
-	char value_1[64] = {0};
-
-	/**
-	 * Another value submitted via form.
-	 */
-	char value_2[64] = {0};
-
-};
-
-
-/**
- * Data kept per request.
- */
-struct Request
-{
-
-	/**
-	 * Associated session.
-	 */
-	Session* session = nullptr;
-
-	/**
-	 * Post processor handling form data (IF this is
-	 * a POST request).
-	 */
-	mhd::PostProcessor* pp = nullptr;
-
-	/**
-	 * URL to serve in response to this POST (if this request
-	 * was a 'POST')
-	 */
-	const char* post_url = nullptr;
-
-};
-
-
 /**
  * Linked list of all active sessions.  Yes, O(n) but a
  * hash table would be overkill for a simple example...
  */
-static struct Session *sessions = nullptr;
 
-
+using Session = Request::Session;
+static Session* sessions = nullptr;
 
 
 /**
  * Return the session handle for this connection, or
  * create one if this is a new user.
  */
-static struct Session *
+static Session::iterator
 get_session (mhd::Connection* connection)
 {
 	const char* cookie = MHD_lookup_connection_value (connection,
@@ -106,7 +39,7 @@ get_session (mhd::Connection* connection)
 	if (cookie != nullptr) {
 
 		/* find existing session */
-		Session* ses = sessions;
+		Session::iterator ses = sessions;
 		while (nullptr != ses) {
 
 			if (0 == strcmp (cookie, ses->sid)) {
@@ -121,12 +54,8 @@ get_session (mhd::Connection* connection)
 		}
 	}
 	/* create fresh session */
-	Session *ret = new (std::nothrow) Session();
-	if (nullptr == ret) {
+	Session* ret = new Session();
 
-		fprintf (stderr, "memory error: %s\n", strerror (errno));
-		return nullptr;
-	}
 	/* not a super-secure way to generate a random session ID,
      but should do for a simple example... */
 	snprintf (ret->sid,
@@ -145,55 +74,13 @@ get_session (mhd::Connection* connection)
 
 
 /**
- * Type of handler that generates a reply.
- *
- * @param cls content for the page (handler-specific)
- * @param mime mime type to use
- * @param session session information
- * @param connection connection to process
- * @param MHD_YES on success, MHD_NO on failure
- */
-typedef int (*PageHandler)(const char* cls,
-		const char *mime,
-		struct Session *session,
-		mhd::Connection* connection);
-
-
-/**
- * Entry we generate for each page served.
- */
-struct Page
-{
-	/**
-	 * Acceptable URL for this page.
-	 */
-	const char *url;
-
-	/**
-	 * Mime type to set for the page.
-	 */
-	const char *mime;
-
-	/**
-	 * Handler to call to generate response.
-	 */
-	PageHandler handler;
-
-	/**
-	 * Extra argument to handler.
-	 */
-	PageSource source;
-};
-
-
-/**
  * Add header to response to set a session cookie.
  *
  * @param session session to use
  * @param response response to modify
  */
 static void
-add_session_cookie (Session* session,
+add_session_cookie (Session& session,
 		mhd::Response* response)
 {
 	char cstr[256];
@@ -201,7 +88,7 @@ add_session_cookie (Session* session,
 			sizeof (cstr),
 			"%s=%s",
 			COOKIE_NAME.c_str(),
-			session->sid);
+			session.sid);
 	if (mhd::no ==
 			MHD_add_response_header (response,
 					mhd::http_header::set_cookie.c_str(),
@@ -225,7 +112,7 @@ add_session_cookie (Session* session,
 static int
 serve_simple_form (const char* form,
 		const char *mime,
-		struct Session *session,
+		Session& session,
 		mhd::Connection *connection)
 {
 
@@ -256,19 +143,16 @@ serve_simple_form (const char* form,
 static int
 fill_v1_form (const char* form,
 		const char *mime,
-		struct Session *session,
+		Session& session,
 		mhd::Connection* connection)
 {
 
-
 	char *reply;
-
 
 	if (-1 == asprintf (&reply,
 			form,
-			session->value_1))
-	{
-		/* oops */
+			session.value_1)) {
+		// oops
 		return mhd::no;
 	}
 	/* return static form */
@@ -298,23 +182,20 @@ fill_v1_form (const char* form,
 static int
 fill_v1_v2_form (const char* form,
 		const char *mime,
-		struct Session *session,
+		Session& session,
 		mhd::Connection* connection)
 {
 
 	char *reply;
-	mhd::Response* response;
 
 	if (-1 == asprintf (&reply,
 			form,
-			session->value_1,
-			session->value_2))
-	{
-		/* oops */
-		return mhd::no;
+			session.value_1,
+			session.value_2)) {
+		return mhd::no; // oops
 	}
 	/* return static form */
-	response = MHD_create_response_from_buffer (strlen (reply),
+	mhd::Response* response = MHD_create_response_from_buffer (strlen (reply),
 			(void *) reply,
 			MHD_RESPMEM_MUST_FREE);
 	add_session_cookie (session, response);
@@ -340,7 +221,7 @@ fill_v1_v2_form (const char* form,
 static int
 not_found_page (const char* /*cls*/,
 		const char *mime,
-		struct Session* /*session*/,
+		Session& /*session*/,
 		mhd::Connection* connection)
 {
 
@@ -403,7 +284,7 @@ post_iterator (void *cls,
 		const char *data, uint64_t off, size_t size)
 {
 	struct Request *request = (Request*)cls;
-	struct Session *session = request->session;
+	Session::iterator session = request->session;
 
 	const std::string done = "DONE";
 	if (done == key)
@@ -487,18 +368,11 @@ create_response (void* /*cls*/,
 		size_t *upload_data_size,
 		void **ptr)
 {
-	mhd::Response *response;
-	struct Request *request;
-	struct Session *session;
-	int ret;
-	unsigned int i;
 
-	request = *(Request**)ptr;
-	if (nullptr == request)
-	{
+	Request *request = *(Request**)ptr;
+	if (nullptr == request) {
 		request = new (std::nothrow) Request();
-		if (nullptr == request)
-		{
+		if (nullptr == request) {
 			fprintf (stderr, "memory error: %s\n", strerror (errno));
 			return mhd::no;
 		}
@@ -506,26 +380,21 @@ create_response (void* /*cls*/,
 		if (method == mhd::http_method::post) {
 			request->pp = MHD_create_post_processor (connection, 1024,
 					&post_iterator, request);
-			if (nullptr == request->pp)
-			{
-				fprintf (stderr, "Failed to setup post processor for `%s'\n",
-						url);
+			if (nullptr == request->pp) {
+				fprintf (stderr, "Failed to setup post processor for `%s'\n", url);
 				return mhd::no; /* internal error */
 			}
 		}
 		return mhd::yes;
 	}
-	if (nullptr == request->session)
-	{
+	if (nullptr == request->session) {
 		request->session = get_session (connection);
-		if (nullptr == request->session)
-		{
-			fprintf (stderr, "Failed to setup session for `%s'\n",
-					url);
+		if (nullptr == request->session) {
+			fprintf (stderr, "Failed to setup session for `%s'\n", url);
 			return mhd::no; /* internal error */
 		}
 	}
-	session = request->session;
+	Session::iterator session = request->session;
 	session->start = time (nullptr);
 	if (method == mhd::http_method::post) {
 
@@ -533,8 +402,7 @@ create_response (void* /*cls*/,
 		MHD_post_process (request->pp,
 				upload_data,
 				*upload_data_size);
-		if (0 != *upload_data_size)
-		{
+		if (0 != *upload_data_size) {
 			*upload_data_size = 0;
 			return mhd::yes;
 		}
@@ -542,31 +410,31 @@ create_response (void* /*cls*/,
 		MHD_destroy_post_processor (request->pp);
 		request->pp = nullptr;
 		method = mhd::http_method::get.c_str(); /* fake 'GET' */
-		if (nullptr != request->post_url)
+		if (nullptr != request->post_url) {
 			url = request->post_url;
+		}
 	}
 
 	if ( (method == mhd::http_method::get) || (method == mhd::http_method::head) ) {
 		/* find out which page to serve */
-		i=0;
+		unsigned i = 0;
 		while ( (pages[i].url != nullptr) &&
-				(0 != strcmp (pages[i].url, url)) )
+				(0 != strcmp (pages[i].url, url)) ) {
 			i++;
+		}
 		const std::string source = getPageSource(pages[i].source);
-		ret = pages[i].handler (source.c_str(),
-				pages[i].mime,
-				session, connection);
-		if (ret != mhd::yes)
-			fprintf (stderr, "Failed to create page for `%s'\n",
-					url);
+		int ret = pages[i].handler (source.c_str(), pages[i].mime, *session, connection);
+		if (ret != mhd::yes) {
+			fprintf (stderr, "Failed to create page for `%s'\n", url);
+		}
 		return ret;
 	}
 	/* unsupported HTTP method */
 	const std::string error_source = getPageSource(PageSource::method_error);
-	response = MHD_create_response_from_buffer (error_source.size(),
+	mhd::Response *response = MHD_create_response_from_buffer (error_source.size(),
 			const_cast<char*>(error_source.c_str()),
 			MHD_RESPMEM_PERSISTENT);
-	ret = MHD_queue_response (connection,
+	int ret = MHD_queue_response (connection,
 			mhd::http_method_not_acceptable,
 			response);
 	MHD_destroy_response (response);
@@ -608,28 +476,22 @@ request_completed_callback (void* /*cls*/,
 static void
 expire_sessions ()
 {
-	struct Session *pos;
-	struct Session *prev;
-	struct Session *next;
-	time_t now;
-
-	now = time (nullptr);
-	prev = nullptr;
-	pos = sessions;
-	while (nullptr != pos)
-	{
-		next = pos->next;
-		if (now - pos->start > 60 * 60)
-		{
+	time_t now = time (nullptr);
+	Session* prev = nullptr;
+	Session* pos = sessions;
+	while (nullptr != pos) {
+		Session* next = pos->next;
+		if (now - pos->start > 60 * 60) {
 			/* expire sessions after 1h */
-			if (nullptr == prev)
+			if (nullptr == prev) {
 				sessions = pos->next;
-			else
+			} else {
 				prev->next = next;
+			}
 			delete pos;
-		}
-		else
+		} else {
 			prev = pos;
+		}
 		pos = next;
 	}
 }
@@ -642,57 +504,53 @@ expire_sessions ()
 int
 main (int argc, char *const *argv)
 {
-	mhd::Daemon* d;
-	struct timeval tv;
-	struct timeval *tvp;
-	fd_set rs;
-	fd_set ws;
-	fd_set es;
-	MHD_socket max;
-	MHD_UNSIGNED_LONG_LONG mhd_timeout;
-
-	if (argc != 2)
-	{
+	if (argc != 2) {
 		printf ("%s PORT\n", argv[0]);
 		return 1;
 	}
 	/* initialize PRNG */
 	srand ((unsigned int) time (nullptr));
-	d = MHD_start_daemon (MHD_USE_DEBUG,
+	mhd::Daemon* d = MHD_start_daemon (MHD_USE_DEBUG,
 			atoi (argv[1]),
 			nullptr, nullptr,
 			&create_response, nullptr,
 			MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int) 15,
 			MHD_OPTION_NOTIFY_COMPLETED, &request_completed_callback, nullptr,
 			MHD_OPTION_END);
-	if (nullptr == d)
+	if (nullptr == d) {
 		return 1;
-	while (1)
-	{
+	}
+
+	while (1) {
 		expire_sessions ();
-		max = 0;
+		MHD_socket max = 0;
+		fd_set rs;
+		fd_set ws;
+		fd_set es;
 		FD_ZERO (&rs);
 		FD_ZERO (&ws);
 		FD_ZERO (&es);
 		if (MHD_YES != MHD_get_fdset (d, &rs, &ws, &es, &max))
 			break; /* fatal internal error */
-			if (MHD_get_timeout (d, &mhd_timeout) == MHD_YES)
-			{
-				tv.tv_sec = mhd_timeout / 1000;
-				tv.tv_usec = (mhd_timeout - (tv.tv_sec * 1000)) * 1000;
-				tvp = &tv;
+		MHD_UNSIGNED_LONG_LONG mhd_timeout;
+		struct timeval tv;
+		struct timeval *tvp;
+		if (MHD_get_timeout (d, &mhd_timeout) == MHD_YES) {
+			tv.tv_sec = mhd_timeout / 1000;
+			tv.tv_usec = (mhd_timeout - (tv.tv_sec * 1000)) * 1000;
+			tvp = &tv;
+		} else {
+			tvp = nullptr;
+		}
+		if (-1 == select (max + 1, &rs, &ws, &es, tvp)) {
+			if (EINTR != errno) {
+				fprintf (stderr,
+						"Aborting due to error during select: %s\n",
+						strerror (errno));
 			}
-			else
-				tvp = nullptr;
-			if (-1 == select (max + 1, &rs, &ws, &es, tvp))
-			{
-				if (EINTR != errno)
-					fprintf (stderr,
-							"Aborting due to error during select: %s\n",
-							strerror (errno));
-				break;
-			}
-			MHD_run (d);
+			break;
+		}
+		MHD_run (d);
 	}
 	MHD_stop_daemon (d);
 	return 0;
