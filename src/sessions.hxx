@@ -104,11 +104,14 @@ struct Session
  */
 struct Request
 {
-	using Session = plainc::Session;
+	using Session = moderncxx::Session;
+	Request(Session::iterator i): session(i) {}
+
+
 	/**
 	 * Associated session.
 	 */
-	Session::iterator session = nullptr;
+	Session::iterator session ;
 
 	/**
 	 * Post processor handling form data (IF this is
@@ -165,6 +168,23 @@ struct Page
 	PageSource source;
 };
 
+int
+create_response (void* /*cls*/,
+		mhd::Connection* connection,
+		const char *url,
+		const char *method,
+		const char* /*version*/,
+		const char *upload_data,
+		size_t *upload_data_size,
+		void **ptr);
 
+void
+request_completed_callback (void* /*cls*/,
+		mhd::Connection* /*connection*/,
+		void **con_cls,
+		mhd::RequestTerminationCode /*toe*/);
+
+void
+expire_sessions ();
 
 #endif /* SESSIONS_HXX_ */
