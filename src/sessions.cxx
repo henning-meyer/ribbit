@@ -369,6 +369,9 @@ create_response (void* /*cls*/,
 		size_t *upload_data_size,
 		void **ptr)
 {
+	printf("create response\n");
+	printf("url: %s\n", url);
+	printf("method: %s\n", method);
 
 	Request *request = *(Request**)ptr;
 	if (nullptr == request) {

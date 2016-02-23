@@ -16,6 +16,44 @@
 
 #include <new>
 
+#include <atomic>
+
+std::atomic<bool> running;
+
+
+#include <stdio.h>
+#include <unistd.h>
+#include <signal.h>
+#include <string.h>
+
+void sig_handler (int /*sig*/, siginfo_t* /*siginfo*/, void* /*context*/)
+{
+	running = false;
+}
+
+void install_signal_handler_helper(int signum) {
+
+	struct sigaction act;
+	memset (&act, '\0', sizeof(act));
+
+	/* Use the sa_sigaction field because the handles has two additional parameters */
+	act.sa_sigaction = &sig_handler;
+
+	/* The SA_SIGINFO flag tells sigaction() to use the sa_sigaction field, not sa_handler. */
+	act.sa_flags = SA_SIGINFO;
+
+	if (sigaction(signum, &act, NULL) < 0) {
+		perror ("failed to install signal handler");
+		exit(1);
+	}
+}
+
+void install_signal_handlers() {
+	install_signal_handler_helper(SIGINT);
+	install_signal_handler_helper(SIGTERM);
+}
+
+
 /**
  * Call with the port number as the only argument.
  * Never terminates (other than by signals, such as CTRL-C).
@@ -23,6 +61,10 @@
 int
 main (int argc, char *const *argv)
 {
+	running = true;
+
+	install_signal_handlers();
+
 	if (argc != 2) {
 		printf ("%s PORT\n", argv[0]);
 		return 1;
@@ -40,7 +82,7 @@ main (int argc, char *const *argv)
 		return 1;
 	}
 
-	while (1) {
+	while (running) {
 		expire_sessions ();
 		MHD_socket max = 0;
 		fd_set rs;
@@ -51,7 +93,7 @@ main (int argc, char *const *argv)
 		FD_ZERO (&es);
 		if (MHD_YES != MHD_get_fdset (d, &rs, &ws, &es, &max))
 			break; /* fatal internal error */
-		MHD_UNSIGNED_LONG_LONG mhd_timeout;
+		unsigned long long mhd_timeout;
 		struct timeval tv;
 		struct timeval *tvp;
 		if (MHD_get_timeout (d, &mhd_timeout) == MHD_YES) {
