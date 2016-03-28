@@ -55,7 +55,7 @@ http_payment_required = MHD_HTTP_PAYMENT_REQUIRED /*402*/,
 http_forbidden = MHD_HTTP_FORBIDDEN /*403*/,
 http_not_found = MHD_HTTP_NOT_FOUND /*404*/,
 http_method_not_allowed = MHD_HTTP_METHOD_NOT_ALLOWED /*405*/,
-http_method_not_acceptable = MHD_HTTP_METHOD_NOT_ACCEPTABLE /*406*/
+http_method_not_acceptable = MHD_HTTP_METHOD_NOT_ACCEPTABLE /*406*/,
 //#define MHD_HTTP_PROXY_AUTHENTICATION_REQUIRED 407
 //#define MHD_HTTP_REQUEST_TIMEOUT 408
 //#define MHD_HTTP_CONFLICT 409
@@ -77,6 +77,7 @@ http_method_not_acceptable = MHD_HTTP_METHOD_NOT_ACCEPTABLE /*406*/
 //#define MHD_HTTP_BLOCKED_BY_WINDOWS_PARENTAL_CONTROLS 450
 //#define MHD_HTTP_UNAVAILABLE_FOR_LEGAL_REASONS 451
 //
+http_internal_server_error = MHD_HTTP_INTERNAL_SERVER_ERROR /*500*/
 //#define MHD_HTTP_INTERNAL_SERVER_ERROR 500
 //#define MHD_HTTP_NOT_IMPLEMENTED 501
 //#define MHD_HTTP_BAD_GATEWAY 502

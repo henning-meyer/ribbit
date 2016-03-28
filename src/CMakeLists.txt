@@ -12,7 +12,7 @@ add_definitions( -D_GLIBCXX_DEBUG=1 )
 
 find_package(PkgConfig)
 
-ADD_EXECUTABLE(ribbit-demo sessions.cxx libmhd.cxx pages.cxx main.cxx)
+ADD_EXECUTABLE(ribbit-demo sessions.cxx libmhd.cxx pages.cxx main.cxx content.cxx html_file.cxx)
 target_link_libraries(ribbit-demo -pthread -lboost_system -lboost_thread -lmicrohttpd)
 
 

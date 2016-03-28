@@ -15,6 +15,8 @@
 
 
 #include <forward_list>
+#include <memory>
+#include <vector>
 
 namespace plainc {
 /**
@@ -136,7 +138,7 @@ struct Request
  * @param connection connection to process
  * @param MHD_YES on success, MHD_NO on failure
  */
-typedef int (*PageHandler)(const char* cls,
+typedef int (*PageHandler)(const char*,size_t,
 		const char *mime,
 		Request::Session& session,
 		mhd::Connection* connection);

@@ -18,13 +18,13 @@
 
 #include <atomic>
 
-std::atomic<bool> running;
-
 
 #include <stdio.h>
 #include <unistd.h>
 #include <signal.h>
-#include <string.h>
+
+
+std::atomic<bool> running;
 
 void sig_handler (int /*sig*/, siginfo_t* /*siginfo*/, void* /*context*/)
 {
@@ -63,14 +63,16 @@ main (int argc, char *const *argv)
 {
 	running = true;
 
-	install_signal_handlers();
-
 	if (argc != 2) {
-		printf ("%s PORT\n", argv[0]);
+		printf ("usage: ribbit-demo PORT\n");
 		return 1;
 	}
+
+	install_signal_handlers();
+
 	/* initialize PRNG */
 	srand ((unsigned int) time (nullptr));
+
 	mhd::Daemon* d = MHD_start_daemon (MHD_USE_DEBUG,
 			atoi (argv[1]),
 			nullptr, nullptr,

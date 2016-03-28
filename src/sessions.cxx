@@ -111,15 +111,15 @@ add_session_cookie (Session& session,
  * @param connection connection to use
  */
 static int
-serve_simple_form (const char* form,
+serve_simple_form (const char* form, size_t size,
 		const char *mime,
 		Session& session,
 		mhd::Connection *connection)
 {
 
 	/* return static form */
-	mhd::Response* response = MHD_create_response_from_buffer (strlen (form),
-			(void *) form,
+	mhd::Response* response = MHD_create_response_from_buffer (size,
+			const_cast<char*> (form),
 			MHD_RESPMEM_PERSISTENT);
 	add_session_cookie (session, response);
 	MHD_add_response_header (response,
@@ -132,6 +132,28 @@ serve_simple_form (const char* form,
 	return ret;
 }
 
+static int
+serve_simple_file (const char* form, size_t size,
+		const char *mime,
+		Session& session,
+		mhd::Connection *connection)
+{
+
+
+	/* return static form */
+	mhd::Response* response = MHD_create_response_from_buffer (size,
+			const_cast<char*>(form),
+			MHD_RESPMEM_PERSISTENT);
+	add_session_cookie (session, response);
+	MHD_add_response_header (response,
+			mhd::http_header::content_encoding.c_str(),
+			mime);
+	int ret = MHD_queue_response (connection,
+			mhd::http_ok,
+			response);
+	MHD_destroy_response (response);
+	return ret;
+}
 
 /**
  * Handler that adds the 'v1' value to the given HTML code.
@@ -142,7 +164,7 @@ serve_simple_form (const char* form,
  * @param connection connection to use
  */
 static int
-fill_v1_form (const char* form,
+fill_v1_form (const char* form, size_t,
 		const char *mime,
 		Session& session,
 		mhd::Connection* connection)
@@ -181,7 +203,7 @@ fill_v1_form (const char* form,
  * @param connection connection to use
  */
 static int
-fill_v1_v2_form (const char* form,
+fill_v1_v2_form (const char* form, size_t,
 		const char *mime,
 		Session& session,
 		mhd::Connection* connection)
@@ -220,16 +242,16 @@ fill_v1_v2_form (const char* form,
  * @param connection connection to use
  */
 static int
-not_found_page (const char* /*cls*/,
+not_found_page (const char* /*cls*/,size_t,
 		const char *mime,
 		Session& /*session*/,
 		mhd::Connection* connection)
 {
 
-	const std::string page_source = getPageSource(PageSource::not_found_error);
+	auto page_source = getPageSource(PageSource::not_found_error);
 	/* unsupported HTTP method */
-	mhd::Response* response = MHD_create_response_from_buffer (page_source.size(),
-			const_cast<char*> (page_source.c_str()),
+	mhd::Response* response = MHD_create_response_from_buffer (page_source->size(),
+			const_cast<char*> (&page_source->begin()[0]),
 			MHD_RESPMEM_PERSISTENT);
 	int ret = MHD_queue_response (connection,
 			mhd::http_not_found,
@@ -251,6 +273,9 @@ static struct Page pages[] =
 		{ "/2", "text/html", &fill_v1_v2_form, PageSource::second_page },
 		{ "/S", "text/html", &serve_simple_form, PageSource::submit_page },
 		{ "/F", "text/html", &serve_simple_form, PageSource::last_page },
+		{ "/face-smile.png", "image/png", &serve_simple_file, PageSource::smile_image },
+		{ "/default.css", "text/css", &serve_simple_file, PageSource::css_file },
+		{ "/favicon.ico", "image/x-icon", &serve_simple_file, PageSource::favicon_file },
 		{ nullptr, nullptr, &not_found_page, PageSource::not_found_error } /* 404 */
 };
 
@@ -426,17 +451,22 @@ create_response (void* /*cls*/,
 				(0 != strcmp (pages[i].url, url)) ) {
 			i++;
 		}
-		const std::string source = getPageSource(pages[i].source);
-		int ret = pages[i].handler (source.c_str(), pages[i].mime, *session, connection);
+		auto source = getPageSource(pages[i].source);
+		std::string mime = "image/png";
+		int ret = mhd::no;
+
+		printf("create response %02x %02x %02x %02x \n", source->begin()[0]&255, source->begin()[1]&255, source->begin()[2]&255, source->begin()[3]&255);
+		ret = pages[i].handler (&source->begin()[0], source->size(), pages[i].mime, *session, connection);
+
 		if (ret != mhd::yes) {
 			fprintf (stderr, "Failed to create page for `%s'\n", url);
 		}
 		return ret;
 	}
 	/* unsupported HTTP method */
-	const std::string error_source = getPageSource(PageSource::method_error);
-	mhd::Response *response = MHD_create_response_from_buffer (error_source.size(),
-			const_cast<char*>(error_source.c_str()),
+	auto error_source = getPageSource(PageSource::method_error);
+	mhd::Response *response = MHD_create_response_from_buffer (error_source->size(),
+			const_cast<char*>(&error_source->begin()[0]),
 			MHD_RESPMEM_PERSISTENT);
 	int ret = MHD_queue_response (connection,
 			mhd::http_method_not_acceptable,
