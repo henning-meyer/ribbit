@@ -54,18 +54,39 @@ inline std::ostream& render_selfclosing(const html_tag_empty& name, std::ostream
 inline std::ostream& render_void(const html_tag& name, std::ostream& o) { render_opening(name, o); return render_closing(name, o); }
 
 inline std::ostream& render_opening(const html_tag& name, const html_attr& attribute, const std::string& value, std::ostream& o) {
-	return o << "<" << name.str() << " " << attribute.str() << "=\"" << value << "\">\n";
+	return o << "<" << name.str() << " " << attribute.str() << "='" << value << "'>\n";
 }
+
+
+inline std::ostream& render_opening(const html_tag& name, const html_attr& attribute1, const std::string& value1,
+		const html_attr& attribute2, const std::string& value2,std::ostream& o) {
+	o << "<" << name.str() << " " << attribute1.str() << "='" << value1 << "' ";
+	o << attribute2.str() << "='" << value2 << "'>\n";
+	return o;
+}
+
+
+inline std::ostream& render_opening(const html_tag& name, const html_attr& attribute1, const std::string& value1,
+		const html_attr& attribute2, const std::string& value2,
+		const html_attr& attribute3, const std::string& value3,
+		std::ostream& o) {
+	o << "<" << name.str() << " " << attribute1.str() << "='" << value1 << "' ";
+	o << attribute2.str() << "='" << value2 << "' ";
+
+	o << attribute3.str() << "='" << value3 << "'>\n";
+	return o;
+}
+
 
 inline std::ostream& render_void(const html_tag& name, const html_attr& attribute, const std::string& value, std::ostream& o) { render_opening(name, attribute, value, o); return render_closing(name, o); }
 
 inline std::ostream& render_selfclosing(const html_tag_empty& name, const html_attr& attribute, const std::string& value, std::ostream& o) {
-	return o << "<" << name.str() << " " << attribute.str() << "=\"" << value << "\"/>\n";
+	return o << "<" << name.str() << " " << attribute.str() << "='" << value << "'/>\n";
 }
 
 
 inline std::ostream& render_selfclosing(const html_tag_empty& name, const html_attr& attribute, const std::string& value,
-		const html_attr& attribute2, const std::string& value2,std::ostream& o) {
+		const html_attr& attribute2, const std::string& value2, std::ostream& o) {
 	return o << "<" << name.str() << " " << attribute.str() << "=\"" << value << "\" " << attribute2.str() << "=\"" << value2 << "\"/>\n";
 }
 
@@ -83,6 +104,15 @@ class scoped_tag {
 public:
 	scoped_tag(const html_tag& tag_name, std::ostream& output): name(tag_name), o(output) { render_opening(name, o); }
 	scoped_tag(const html_tag& tag_name, const html_attr& attr1, const std::string& val1, std::ostream& output): name(tag_name), o(output) { render_opening(name, attr1, val1, o); }
+
+	scoped_tag(const html_tag& tag_name, const html_attr& attr1, const std::string& val1, const html_attr& attr2, const std::string& val2, std::ostream& output): name(tag_name), o(output)
+	{ render_opening(name, attr1, val1, attr2, val2, o); }
+
+
+	scoped_tag(const html_tag& tag_name, const html_attr& attr1, const std::string& val1, const html_attr& attr2, const std::string& val2, const html_attr& attr3, const std::string& val3, std::ostream& output): name(tag_name), o(output)
+	{ render_opening(name, attr1, val1, attr2, val2,attr3, val3, o); }
+
+
 	// scoped_tag(const tag_attribute_value& tav, std::ostream& output): name(tav.tag), o(output) {render_opening(tav.tag, tav.attribute, tav.value, o); }
 	~scoped_tag() { render_closing(name, o); }
 };
@@ -107,6 +137,9 @@ extern const html_tag html;
 extern const html_tag p;
 extern const html_tag em;
 extern const html_tag strong;
+extern const html_tag form;
+extern const html_tag_empty input;
+extern const html_tag textarea;
 
 extern const html_tag div;
 extern const html_tag span;
@@ -136,6 +169,14 @@ extern const html_attr title;
 extern const html_attr width;
 extern const html_attr height;
 extern const html_attr class_attr;
+
+extern const html_attr action;
+extern const html_attr method;
+extern const html_attr value;
+extern const html_attr cols;
+extern const html_attr rows;
+extern const html_attr autocomplete;
+
 }
 
 

@@ -38,8 +38,8 @@ const html_tag p { "p" };
 const html_tag em { "em" };
 const html_tag strong { "strong" };
 const html_tag form { "form" };
-const html_tag input { "input" };
-
+const html_tag_empty input { "input" };
+const html_tag textarea { "textarea" };
 
 const html_tag div { "div" };
 const html_tag span { "span" };
@@ -75,7 +75,11 @@ const html_attr class_attr { "class" };
 const html_attr charset { "charset" };
 const html_attr xmlns { "xmlns" };
 const html_attr action { "action" };
-
+const html_attr method { "method" };
+const html_attr value { "value" };
+const html_attr cols { "cols" };
+const html_attr rows { "rows" };
+const html_attr autocomplete { "autocomplete" };
 }
 
 
@@ -103,16 +107,24 @@ std::ostream& render_stylesheet(std::ostream& o, const std::string& css) {
 	return o;
 }
 
+std::ostream& render_favicon(std::ostream& o, const std::string& type, const std::string& image) {
+	//<link rel="shortcut icon" type="image/png" href="face-smile.png">
+	render_selfclosing(tag::link, attr::rel, "shortcut icon", attr::type, type, attr::href, image, o);
+	return o;
+}
+
 
 std::ostream& render_header(const std::string& title, std::ostream& o) {
 	{
 		scoped_tag head(tag::head, o);
 		render_selfclosing(tag::meta, attr::charset, meta_charset_utf8, o);
+		render_favicon(o,"image/png","face-smile.png");
 		render_stylesheet(o, "default.css");
 		{
 			scoped_tag scoped_title(tag::title, o);
 			o << title;
 		}
+
 	}
 	return o;
 }
@@ -171,12 +183,14 @@ std::ostream& render_body(const std::string& message, std::ostream& o) {
 
 
 				{
+					using namespace presentation;
 					scoped_tag div_primary(tag::div,attr::id,"primarycontent", o);
 
 					for(int i = 0; i < 2; i++) {
 
 					post some_post;
-					some_post.set_message(message);
+					some_post.set_date_and_message("2016 April 3", message);
+					some_post.set_author("Alice", "<img src='face-smile.png' width='32' height='32' style='width:4em;height:4em' />");
 					o << some_post.html();
 
 					}
@@ -242,11 +256,6 @@ std::ostream& render_body(const std::string& message, std::ostream& o) {
 	return o;
 }
 
-std::ostream& render_favicon(std::ostringstream& o, const std::string& type, const std::string& image) {
-	//<link rel="shortcut icon" type="image/png" href="face-smile.png">
-	render_selfclosing(tag::link, attr::rel, "shortcut icon", attr::type, type, attr::href, image, o);
-	return o;
-}
 
 
 std::string minimal_html(const std::string& title, const std::string& message) {

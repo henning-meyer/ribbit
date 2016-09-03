@@ -11,6 +11,8 @@
 #include <memory>
 #include <vector>
 
+namespace presentation {
+
 class content;
 class comment;
 
@@ -40,9 +42,13 @@ public:
 	std::shared_ptr<comment> first_comment() { return helper.first_comment(); }
 	std::shared_ptr<comment> next_comment(const std::shared_ptr<comment> current) { return helper.next_comment(current); }
 
-	void set_message(const std::string& message) { raw_text = message; }
+	void set_date_and_message(const std::string& date, const std::string& message) { raw_text = message; raw_date = date; }
+	void set_author(const std::string& name, const std::string& pic) { author_name = name; author_pic = pic; }
 private:
 	std::string raw_text;
+	std::string raw_date;
+	std::string author_pic;
+	std::string author_name;
 	content_helper helper;
 };
 
@@ -65,6 +71,6 @@ private:
 	id_type id;
 };
 
-
+}
 
 #endif /* CONTENT_HXX_ */
